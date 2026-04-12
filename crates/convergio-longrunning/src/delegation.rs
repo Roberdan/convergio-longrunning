@@ -28,11 +28,13 @@ pub fn create_child(
 }
 
 /// Build the full delegation tree rooted at `root_id`.
+/// Depth is capped at `MAX_TREE_DEPTH` to prevent stack overflow from cycles.
 pub fn build_tree(conn: &Connection, root_id: &str) -> LongRunResult<Option<DelegationNode>> {
+    crate::types::validate_execution_id(root_id)?;
     let root = load_node(conn, root_id)?;
     match root {
         Some(mut node) => {
-            populate_children(conn, &mut node)?;
+            populate_children(conn, &mut node, 0)?;
             Ok(Some(node))
         }
         None => Ok(None),
@@ -89,10 +91,22 @@ fn load_node(conn: &Connection, id: &str) -> LongRunResult<Option<DelegationNode
     }
 }
 
-fn populate_children(conn: &Connection, node: &mut DelegationNode) -> LongRunResult<()> {
+fn populate_children(
+    conn: &Connection,
+    node: &mut DelegationNode,
+    depth: usize,
+) -> LongRunResult<()> {
+    if depth >= crate::types::MAX_TREE_DEPTH {
+        tracing::warn!(
+            execution_id = node.execution_id.as_str(),
+            depth,
+            "delegation tree depth limit reached, truncating"
+        );
+        return Ok(());
+    }
     let children = list_children(conn, &node.execution_id)?;
     for mut child in children {
-        populate_children(conn, &mut child)?;
+        populate_children(conn, &mut child, depth + 1)?;
         node.children.push(child);
     }
     Ok(())
@@ -100,7 +114,13 @@ fn populate_children(conn: &Connection, node: &mut DelegationNode) -> LongRunRes
 
 fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DelegationNode> {
     let stage_str: String = row.get(6)?;
-    let stage = ExecutionStage::parse(&stage_str).unwrap_or(ExecutionStage::Running);
+    let stage = ExecutionStage::parse(&stage_str).unwrap_or_else(|| {
+        tracing::warn!(
+            stage = stage_str.as_str(),
+            "unknown execution stage, defaulting to Running"
+        );
+        ExecutionStage::Running
+    });
     Ok(DelegationNode {
         execution_id: row.get(0)?,
         parent_id: row.get(1)?,

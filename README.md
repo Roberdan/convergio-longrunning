@@ -87,6 +87,18 @@ Milano — 23 June 2025
 5. **Learn in small loops, ship value early.**
 6. **Bias is a bug—we detect, test, and fix continuously.**
 
+## Security
+
+All runtime SQL uses parameterized queries. Input validation enforces:
+- Execution IDs: alphanumeric + `-_. `, max 256 chars
+- Budget costs: non-negative, finite
+- Progress percent: 0.0–100.0
+- Heartbeat intervals: > 0
+
+Race-condition-prone operations (checkpoint save, budget recording, reaping)
+are wrapped in SQLite transactions. HTTP error responses do not leak internal
+details. See [ADR-002](docs/adr/002-audit-security-fixes.md) for full audit.
+
 *Signed in Milano, 23 June 2025 — Roberto D'Angelo · Claude · ChatGPT*
 
 *Made with love for Mario in Milano, Italy, Europe.*

@@ -13,10 +13,10 @@ pub fn longrunning_tools() -> Vec<McpToolDef> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "string"},
-                    "agent_id": {"type": "string"}
+                    "execution_id": {"type": "string", "description": "Unique execution identifier"},
+                    "interval_secs": {"type": "integer", "description": "Heartbeat interval in seconds", "minimum": 1}
                 },
-                "required": ["task_id", "agent_id"]
+                "required": ["execution_id", "interval_secs"]
             }),
             min_ring: "trusted".into(),
             path_params: vec![],
@@ -29,10 +29,9 @@ pub fn longrunning_tools() -> Vec<McpToolDef> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "string"},
-                    "status": {"type": "string"}
+                    "execution_id": {"type": "string", "description": "Unique execution identifier"}
                 },
-                "required": ["task_id"]
+                "required": ["execution_id"]
             }),
             min_ring: "trusted".into(),
             path_params: vec![],

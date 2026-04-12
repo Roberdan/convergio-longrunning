@@ -17,8 +17,38 @@ pub enum LongRunError {
     Stale { elapsed_secs: u64, max_secs: u64 },
     #[error("not found: {0}")]
     NotFound(String),
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
     #[error("{0}")]
     Internal(String),
+}
+
+/// Max allowed length for execution IDs and other string identifiers.
+pub const MAX_ID_LEN: usize = 256;
+/// Max recursion depth for delegation tree traversal.
+pub const MAX_TREE_DEPTH: usize = 64;
+
+/// Validate that an execution_id is non-empty and within length limits.
+pub fn validate_execution_id(id: &str) -> LongRunResult<()> {
+    if id.is_empty() {
+        return Err(LongRunError::InvalidInput(
+            "execution_id must not be empty".into(),
+        ));
+    }
+    if id.len() > MAX_ID_LEN {
+        return Err(LongRunError::InvalidInput(format!(
+            "execution_id exceeds max length of {MAX_ID_LEN}"
+        )));
+    }
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+    {
+        return Err(LongRunError::InvalidInput(
+            "execution_id contains invalid characters (allowed: alphanumeric, -, _, .)".into(),
+        ));
+    }
+    Ok(())
 }
 
 pub type LongRunResult<T> = Result<T, LongRunError>;
@@ -135,6 +165,29 @@ mod tests {
         assert!(ExecutionStage::Completing.is_terminal());
         assert!(ExecutionStage::Failed.is_terminal());
         assert!(ExecutionStage::Reaped.is_terminal());
+    }
+
+    #[test]
+    fn validate_execution_id_rejects_empty() {
+        assert!(validate_execution_id("").is_err());
+    }
+
+    #[test]
+    fn validate_execution_id_rejects_too_long() {
+        let long = "a".repeat(MAX_ID_LEN + 1);
+        assert!(validate_execution_id(&long).is_err());
+    }
+
+    #[test]
+    fn validate_execution_id_rejects_special_chars() {
+        assert!(validate_execution_id("exec/../../etc").is_err());
+        assert!(validate_execution_id("exec; DROP TABLE").is_err());
+    }
+
+    #[test]
+    fn validate_execution_id_accepts_valid() {
+        assert!(validate_execution_id("exec-1").is_ok());
+        assert!(validate_execution_id("my_task.v2").is_ok());
     }
 
     #[test]

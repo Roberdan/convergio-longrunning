@@ -16,6 +16,12 @@ pub fn update(
     bus: Option<&Arc<EventBus>>,
     snap: &ProgressSnapshot,
 ) -> LongRunResult<()> {
+    crate::types::validate_execution_id(&snap.execution_id)?;
+    if !snap.percent.is_finite() || snap.percent < 0.0 || snap.percent > 100.0 {
+        return Err(crate::types::LongRunError::InvalidInput(
+            "percent must be between 0.0 and 100.0".into(),
+        ));
+    }
     conn.execute(
         "UPDATE lr_executions SET percent = ?1, stage = ?2, \
          message = ?3, updated_at = datetime('now') WHERE id = ?4",
@@ -59,7 +65,13 @@ pub fn load(conn: &Connection, execution_id: &str) -> LongRunResult<Option<Progr
     );
     match result {
         Ok((percent, stage_str, cost, message)) => {
-            let stage = ExecutionStage::parse(&stage_str).unwrap_or(ExecutionStage::Running);
+            let stage = ExecutionStage::parse(&stage_str).unwrap_or_else(|| {
+                tracing::warn!(
+                    stage = stage_str.as_str(),
+                    "unknown execution stage, defaulting to Running"
+                );
+                ExecutionStage::Running
+            });
             Ok(Some(ProgressSnapshot {
                 execution_id: execution_id.to_string(),
                 percent,
