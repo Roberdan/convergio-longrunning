@@ -12,6 +12,15 @@ use crate::types::LongRunResult;
 /// Ensures the parent `lr_executions` row exists (auto-creates with
 /// agent="unknown", node="local") so the FK constraint is satisfied.
 pub fn register(conn: &Connection, execution_id: &str, interval_secs: u64) -> LongRunResult<()> {
+    crate::types::validate_execution_id(execution_id)?;
+    if interval_secs == 0 {
+        return Err(crate::types::LongRunError::InvalidInput(
+            "interval_secs must be > 0".into(),
+        ));
+    }
+    let interval_i64 = i64::try_from(interval_secs).map_err(|_| {
+        crate::types::LongRunError::InvalidInput("interval_secs overflows i64".into())
+    })?;
     conn.execute(
         "INSERT OR IGNORE INTO lr_executions (id, agent, node) \
          VALUES (?1, 'unknown', 'local')",
@@ -20,7 +29,7 @@ pub fn register(conn: &Connection, execution_id: &str, interval_secs: u64) -> Lo
     conn.execute(
         "INSERT OR REPLACE INTO lr_heartbeats (execution_id, last_seen, interval_s) \
          VALUES (?1, datetime('now'), ?2)",
-        params![execution_id, interval_secs as i64],
+        params![execution_id, interval_i64],
     )?;
     tracing::debug!(execution_id, interval_secs, "heartbeat registered");
     Ok(())
@@ -132,5 +141,19 @@ mod tests {
         register(&conn, "e1", 30).unwrap();
         let stale = find_stale(&conn).unwrap();
         assert!(stale.is_empty(), "fresh heartbeat should not be stale");
+    }
+
+    #[test]
+    fn register_zero_interval_rejected() {
+        let conn = setup();
+        let err = register(&conn, "e1", 0).unwrap_err();
+        assert!(err.to_string().contains("interval_secs must be > 0"));
+    }
+
+    #[test]
+    fn register_empty_id_rejected() {
+        let conn = setup();
+        let err = register(&conn, "", 30).unwrap_err();
+        assert!(err.to_string().contains("must not be empty"));
     }
 }

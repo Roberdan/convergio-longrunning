@@ -19,6 +19,8 @@ pub struct ReapedExecution {
 }
 
 /// Run one reaper cycle: find stale heartbeats, mark as reaped, kill children.
+/// Each execution is reaped within a transaction to prevent races with concurrent
+/// heartbeat beats or checkpoint saves.
 pub fn reap_cycle(pool: &ConnPool) -> LongRunResult<Vec<ReapedExecution>> {
     let conn = pool.get()?;
     let stale = crate::heartbeat::find_stale(&conn)?;
@@ -31,21 +33,23 @@ pub fn reap_cycle(pool: &ConnPool) -> LongRunResult<Vec<ReapedExecution>> {
             max_secs = max,
             "reaping stale execution"
         );
-        // Mark execution as reaped
-        conn.execute(
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
             "UPDATE lr_executions SET stage = 'reaped', \
              updated_at = datetime('now') WHERE id = ?1",
             params![exec_id],
         )?;
-        // Propagate death to children
-        conn.execute(
+        tx.execute(
             "UPDATE lr_executions SET stage = 'reaped', \
              updated_at = datetime('now') \
              WHERE parent_id = ?1 AND stage NOT IN ('completing', 'failed', 'reaped')",
             params![exec_id],
         )?;
-        // Clean up heartbeat
-        crate::heartbeat::unregister(&conn, exec_id)?;
+        tx.execute(
+            "DELETE FROM lr_heartbeats WHERE execution_id = ?1",
+            params![exec_id],
+        )?;
+        tx.commit()?;
 
         reaped.push(ReapedExecution {
             execution_id: exec_id.clone(),

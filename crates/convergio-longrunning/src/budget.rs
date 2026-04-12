@@ -9,17 +9,26 @@ use crate::types::{LongRunError, LongRunResult};
 
 /// Record cost for an execution and check budget.
 ///
+/// Uses a transaction to prevent TOCTOU race where concurrent cost recordings
+/// could both pass the budget check before either updates the stage.
 /// Returns Ok(remaining) if within budget, or BudgetExceeded error if over.
 pub fn record_cost(conn: &Connection, execution_id: &str, cost_usd: f64) -> LongRunResult<f64> {
-    // Atomically update spent
-    conn.execute(
+    crate::types::validate_execution_id(execution_id)?;
+    if cost_usd < 0.0 || !cost_usd.is_finite() {
+        return Err(LongRunError::InvalidInput(
+            "cost_usd must be non-negative and finite".into(),
+        ));
+    }
+
+    let tx = conn.unchecked_transaction()?;
+
+    tx.execute(
         "UPDATE lr_executions SET spent_usd = spent_usd + ?1, \
          updated_at = datetime('now') WHERE id = ?2",
         params![cost_usd, execution_id],
     )?;
 
-    // Check budget
-    let (spent, budget): (f64, f64) = conn.query_row(
+    let (spent, budget): (f64, f64) = tx.query_row(
         "SELECT spent_usd, budget_usd FROM lr_executions WHERE id = ?1",
         params![execution_id],
         |row| Ok((row.get(0)?, row.get(1)?)),
@@ -27,12 +36,12 @@ pub fn record_cost(conn: &Connection, execution_id: &str, cost_usd: f64) -> Long
 
     // budget_usd == 0 means unlimited
     if budget > 0.0 && spent >= budget {
-        // Pause the execution
-        conn.execute(
+        tx.execute(
             "UPDATE lr_executions SET stage = 'paused', \
              updated_at = datetime('now') WHERE id = ?1",
             params![execution_id],
         )?;
+        tx.commit()?;
         tracing::warn!(
             execution_id,
             spent,
@@ -44,6 +53,8 @@ pub fn record_cost(conn: &Connection, execution_id: &str, cost_usd: f64) -> Long
             limit: budget,
         });
     }
+
+    tx.commit()?;
 
     let remaining = if budget > 0.0 {
         budget - spent
@@ -167,5 +178,18 @@ mod tests {
         let conn = setup();
         let err = status(&conn, "nope").unwrap_err();
         assert!(err.to_string().contains("nope"));
+    }
+
+    #[test]
+    fn record_negative_cost_rejected() {
+        let conn = setup();
+        conn.execute(
+            "INSERT INTO lr_executions (id, agent, node, budget_usd) \
+             VALUES ('e-neg', 'a', 'n', 1.0)",
+            [],
+        )
+        .unwrap();
+        let err = record_cost(&conn, "e-neg", -0.5).unwrap_err();
+        assert!(err.to_string().contains("non-negative"));
     }
 }

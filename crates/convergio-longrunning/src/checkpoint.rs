@@ -9,23 +9,25 @@ use serde_json::Value;
 use crate::types::LongRunResult;
 
 /// Save a checkpoint for an execution. Replaces previous checkpoint.
+/// Uses a transaction to prevent race conditions between DELETE and INSERT.
 pub fn save(conn: &Connection, execution_id: &str, state: &Value) -> LongRunResult<()> {
+    crate::types::validate_execution_id(execution_id)?;
     let state_json = serde_json::to_string(state)?;
-    // Remove old checkpoint, insert fresh
-    conn.execute(
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
         "DELETE FROM lr_checkpoints WHERE execution_id = ?1",
         params![execution_id],
     )?;
-    conn.execute(
+    tx.execute(
         "INSERT INTO lr_checkpoints (execution_id, state) VALUES (?1, ?2)",
         params![execution_id, state_json],
     )?;
-    // Update execution stage
-    conn.execute(
+    tx.execute(
         "UPDATE lr_executions SET stage = 'checkpointing', \
          updated_at = datetime('now') WHERE id = ?1",
         params![execution_id],
     )?;
+    tx.commit()?;
     tracing::debug!(execution_id, "checkpoint saved");
     Ok(())
 }
