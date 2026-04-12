@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 
 /// Errors specific to long-running executions.
 #[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
 pub enum LongRunError {
     #[error("database: {0}")]
     Db(#[from] rusqlite::Error),
