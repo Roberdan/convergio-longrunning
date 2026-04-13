@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.1...v0.4.2) (2026-04-13)
+
+
+### Bug Fixes
+
+* fix malformed convergio-ipc dependency in Cargo.toml ([#8](https://github.com/Roberdan/convergio-longrunning/issues/8)) ([ae6c06d](https://github.com/Roberdan/convergio-longrunning/commit/ae6c06de2b8f556c00589b796c0b492d34561d57))
+
 ## [0.4.1](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.0...v0.4.1) (2026-04-13)
 
 
