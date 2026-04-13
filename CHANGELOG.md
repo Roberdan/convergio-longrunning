@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.3...v0.4.4) (2026-04-13)
+
+
+### Bug Fixes
+
+* pass CARGO_REGISTRY_TOKEN to release workflow ([a5f6cf7](https://github.com/Roberdan/convergio-longrunning/commit/a5f6cf796038cd37745a4b790415a13300cc7fe7))
+
 ## [0.4.3](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.2...v0.4.3) (2026-04-13)
 
 
