@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.0...v0.4.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* **deps:** update convergio-ipc to v0.1.6 (SDK v0.1.9 aligned) ([59deca6](https://github.com/Roberdan/convergio-longrunning/commit/59deca6aaf84f8b4416e08b07c9d961ff3e40448))
+
 ## [0.4.0](https://github.com/Roberdan/convergio-longrunning/compare/v0.3.0...v0.4.0) (2026-04-13)
 
 
