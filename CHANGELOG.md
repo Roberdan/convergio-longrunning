@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.2...v0.4.3) (2026-04-13)
+
+
+### Bug Fixes
+
+* add crates.io publishing metadata (description, repository) ([258bec5](https://github.com/Roberdan/convergio-longrunning/commit/258bec56bea6e714f0ecf7e99855d2bcc41c1bdb))
+
 ## [0.4.2](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.1...v0.4.2) (2026-04-13)
 
 
