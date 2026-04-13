@@ -82,24 +82,41 @@ pub fn status(conn: &Connection, execution_id: &str) -> LongRunResult<(f64, f64)
 
 /// Propagate budget from parent to child execution.
 /// Child gets a fraction of the remaining parent budget.
+///
+/// Uses a transaction to prevent TOCTOU race where concurrent propagations
+/// could both read the same remaining budget before either writes.
 pub fn propagate(
     conn: &Connection,
     parent_id: &str,
     child_id: &str,
     fraction: f64,
 ) -> LongRunResult<f64> {
-    let (parent_spent, parent_budget) = status(conn, parent_id)?;
+    let tx = conn.unchecked_transaction()?;
+
+    let (parent_spent, parent_budget): (f64, f64) = tx
+        .query_row(
+            "SELECT spent_usd, budget_usd FROM lr_executions WHERE id = ?1",
+            params![parent_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => LongRunError::NotFound(parent_id.to_string()),
+            other => other.into(),
+        })?;
+
     let remaining = if parent_budget > 0.0 {
         (parent_budget - parent_spent).max(0.0)
     } else {
         0.0 // unlimited parent => child gets 0 (unlimited)
     };
     let child_budget = remaining * fraction.clamp(0.0, 1.0);
-    conn.execute(
+    tx.execute(
         "UPDATE lr_executions SET budget_usd = ?1, \
          updated_at = datetime('now') WHERE id = ?2",
         params![child_budget, child_id],
     )?;
+
+    tx.commit()?;
     Ok(child_budget)
 }
 
