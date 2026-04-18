@@ -35,14 +35,24 @@ pub fn update(
 
     // Publish to SSE bus if available
     if let Some(bus) = bus {
-        let data = serde_json::to_string(snap).unwrap_or_default();
-        bus.publish(IpcEvent {
-            from: "longrunning".into(),
-            to: None,
-            content: data,
-            event_type: "progress".into(),
-            ts: chrono::Utc::now().to_rfc3339(),
-        });
+        match serde_json::to_string(snap) {
+            Ok(data) => {
+                bus.publish(IpcEvent {
+                    from: "longrunning".into(),
+                    to: None,
+                    content: data,
+                    event_type: "progress".into(),
+                    ts: chrono::Utc::now().to_rfc3339(),
+                });
+            }
+            Err(e) => {
+                tracing::warn!(
+                    execution_id = snap.execution_id.as_str(),
+                    error = %e,
+                    "failed to serialize progress for SSE, skipping publish"
+                );
+            }
+        }
     }
 
     Ok(())
