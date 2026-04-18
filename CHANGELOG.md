@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.5](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.4...v0.4.5) (2026-04-18)
+
+
+### Bug Fixes
+
+* close TOCTOU races in budget propagation and reaper, log SSE serialization errors ([26b983b](https://github.com/Roberdan/convergio-longrunning/commit/26b983b57804694f41fd06ae41e049ea25d02154))
+* **deps:** bump rustls-webpki 0.103.11 -&gt; 0.103.12 (RUSTSEC-2026-0099) ([cc4b371](https://github.com/Roberdan/convergio-longrunning/commit/cc4b371240c8d1b504d63b3dab77f0802708dd90))
+* security and quality audit pass 2 ([e4509e9](https://github.com/Roberdan/convergio-longrunning/commit/e4509e9937fe4d3c22f49dbf47c91cb3e982296d))
+
 ## [0.4.4](https://github.com/Roberdan/convergio-longrunning/compare/v0.4.3...v0.4.4) (2026-04-13)
 
 
